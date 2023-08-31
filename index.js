@@ -1,3 +1,6 @@
+const path = require('path');
+const fs = require('fs');
+
 module.exports = {
     rules: {
         'no-relative-parent-imports': {
@@ -11,18 +14,33 @@ module.exports = {
                 schema: [],
             },
             create(context) {
+                const projectRootDir = process.cwd();
+                const srcDir = path.resolve(projectRootDir, 'src');
+                const namespaceDirs = fs.readdirSync(srcDir)
+                    .map((dir) => path.join(srcDir, dir))
+                    .filter((dir) => fs.statSync(dir).isDirectory());
+
+                console.log({namespaceDirs})
+
                 return {
                     ImportDeclaration(node) {
                         const source = node.source.value;
-                        const isRelativeImport = source.startsWith(".");
-                        const isParentImport = source.startsWith("..");
+                        const isRelativeImport = source.startsWith('.');
+                        const isParentImport = source.startsWith('..');
 
                         if (isRelativeImport && isParentImport) {
-                            context.report({
-                                node,
-                                message:
-              "Relative imports from parent directories are not allowed.",
-                            });
+
+                            const currentFileDir = path.dirname(context.getFilename());
+                            const parentDir = path.join(currentFileDir, source);
+                            const currentFileDirNamespace = namespaceDirs.find((dir) => currentFileDir.startsWith(dir));
+                            const parentDirNamespace = namespaceDirs.find((dir) => parentDir.startsWith(dir));
+
+                            if (parentDirNamespace !== currentFileDirNamespace) {
+                                context.report({
+                                    node,
+                                    message: 'Relative imports from parent directories are not allowed.',
+                                });
+                            }
                         }
                     },
                 };
